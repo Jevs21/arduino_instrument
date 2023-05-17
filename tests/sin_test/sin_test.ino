@@ -6,6 +6,9 @@
 #include <tables/square_no_alias_2048_int8.h>
 #include <Keypad.h>
 
+// TODO: FIgure out way to implement screen through
+// IC2 pins with the mozzi library
+
 // use: Oscil <table_size, update_rate> oscilName (wavetable), look in .h file of table #included above
 Oscil<SIN2048_NUM_CELLS, AUDIO_RATE> aSin1(SIN2048_DATA);
 Oscil<SIN2048_NUM_CELLS, AUDIO_RATE> aSin2(SIN2048_DATA);
