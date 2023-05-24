@@ -5,6 +5,7 @@
 #include <tables/saw2048_int8.h> // sine table for oscillator
 #include <tables/square_no_alias_2048_int8.h>
 #include <Keypad.h>
+#include <LowPassFilter.h>
 
 // TODO: FIgure out way to implement screen through
 // IC2 pins with the mozzi library
@@ -16,10 +17,27 @@ Oscil<SIN2048_NUM_CELLS, AUDIO_RATE> aSin3(SIN2048_DATA);
 Oscil<SIN2048_NUM_CELLS, AUDIO_RATE> aSin4(SIN2048_DATA);
 Oscil<SIN2048_NUM_CELLS, AUDIO_RATE> aSin[] = {aSin1, aSin2, aSin3, aSin4};
 
-Oscil<SAW2048_NUM_CELLS, AUDIO_RATE> aSaw(SAW2048_DATA);
-Oscil<SQUARE_NO_ALIAS_2048_NUM_CELLS, AUDIO_RATE> aSqu(SQUARE_NO_ALIAS_2048_DATA);
-Oscil<COS2048_NUM_CELLS, AUDIO_RATE> aCos(COS2048_DATA);
+Oscil<SAW2048_NUM_CELLS, AUDIO_RATE> aSaw1(SAW2048_DATA);
+Oscil<SAW2048_NUM_CELLS, AUDIO_RATE> aSaw2(SAW2048_DATA);
+Oscil<SAW2048_NUM_CELLS, AUDIO_RATE> aSaw3(SAW2048_DATA);
+Oscil<SAW2048_NUM_CELLS, AUDIO_RATE> aSaw4(SAW2048_DATA);
+Oscil<SAW2048_NUM_CELLS, AUDIO_RATE> aSaw[] = {aSaw1, aSaw2, aSaw3, aSaw4};
+
+Oscil<SQUARE_NO_ALIAS_2048_NUM_CELLS, AUDIO_RATE> aSqu1(SQUARE_NO_ALIAS_2048_DATA);
+Oscil<SQUARE_NO_ALIAS_2048_NUM_CELLS, AUDIO_RATE> aSqu2(SQUARE_NO_ALIAS_2048_DATA);
+Oscil<SQUARE_NO_ALIAS_2048_NUM_CELLS, AUDIO_RATE> aSqu3(SQUARE_NO_ALIAS_2048_DATA);
+Oscil<SQUARE_NO_ALIAS_2048_NUM_CELLS, AUDIO_RATE> aSqu4(SQUARE_NO_ALIAS_2048_DATA);
+Oscil<SQUARE_NO_ALIAS_2048_NUM_CELLS, AUDIO_RATE> aSqu[] = {aSqu1, aSqu2, aSqu3, aSqu4};
+
+Oscil<COS2048_NUM_CELLS, AUDIO_RATE> aCos1(COS2048_DATA);
+Oscil<COS2048_NUM_CELLS, AUDIO_RATE> aCos2(COS2048_DATA);
+Oscil<COS2048_NUM_CELLS, AUDIO_RATE> aCos3(COS2048_DATA);
+Oscil<COS2048_NUM_CELLS, AUDIO_RATE> aCos4(COS2048_DATA);
+Oscil<COS2048_NUM_CELLS, AUDIO_RATE> aCos[] = {aCos1, aCos2, aCos3, aCos4};
+
 Oscil<COS2048_NUM_CELLS, AUDIO_RATE> aVibrato(COS2048_DATA);
+
+LowPassFilter lpf;
 
 // use #define for CONTROL_RATE, not a constant
 #define CONTROL_RATE 64 // Hz, powers of 2 are most reliable
@@ -62,15 +80,18 @@ bool keyFound = false;
 int freq = 262;
 int waveform = 0;
 int intensity = 255;
+int filtCutoff = 0;
+int resonance = 0;
 
 void setup(){
   Serial.begin(115200);
   startMozzi(CONTROL_RATE); // :)
   // aSin.setFreq(freq); // set the frequency
-  aSaw.setFreq(freq);
-  aSqu.setFreq(freq);
-  aCos.setFreq(freq);
+  // aSaw.setFreq(freq);
+  // aSqu.setFreq(freq);
+  // aCos.setFreq(freq);
   aVibrato.setFreq(15.f);
+  // lpf.setResonance(10);
 }
 
 void updateControl(){
@@ -88,6 +109,8 @@ void updateControl(){
             keyFound = true;
 
             aSin[keyCount].setFreq(freq);
+            aSaw[keyCount].setFreq(freq);
+            aSqu[keyCount].setFreq(freq);
 
             Serial.print(i);
             Serial.print(" ");
@@ -106,17 +129,21 @@ void updateControl(){
 
   if (keyFound) {
     // aSin.setFreq(freq);
-    aSaw.setFreq(freq);
-    aCos.setFreq(freq);
-    aSqu.setFreq(freq);
+    // aSaw.setFreq(freq);
+    // aCos.setFreq(freq);
+    // aSqu.setFreq(freq);
 
     int knob1 = mozziAnalogRead(KNOB_PIN_1);
     int knob2 = mozziAnalogRead(KNOB_PIN_2);
     int knob3 = mozziAnalogRead(KNOB_PIN_3);
     int knob4 = mozziAnalogRead(KNOB_PIN_4);
-
+    
+    resonance = map(knob1, 0, 1023, 0, 255);
+    filtCutoff = map(knob2, 0, 1023, 10, 255);
     intensity = map(knob3, 0, 1023, 0, 255);
     waveform = map(knob4, 0, 1023, 0, 3);
+
+    lpf.setCutoffFreqAndResonance(filtCutoff, resonance);
 
     Serial.print("Freq: ");
     Serial.print(freq);
@@ -124,11 +151,11 @@ void updateControl(){
     Serial.print(knob1);
     Serial.print("=>");
     Serial.print("NA");
-    Serial.print(", NA (2): ");
+    Serial.print(", HPF (2): ");
     Serial.print(knob2);
     Serial.print("=>");
-    Serial.print("NA");
-    Serial.print(", NA (3): ");
+    Serial.print(filtCutoff);
+    Serial.print(", Vibrato (3): ");
     Serial.print(knob3);
     Serial.print("=>");
     Serial.print(intensity);
@@ -143,19 +170,30 @@ void updateControl(){
 int updateAudio(){
   if (keyFound) {
     Q15n16 vibrato = (Q15n16) intensity * aVibrato.next();
+    int asig = 0;
     if (waveform == 0) {
-      int asig = 0;
       for (int i = 0; i < keyCount; i++) {
         asig += aSin[i].phMod(vibrato);
       }
-      return asig >>3;
+      // int lowPassSig = LPF.next(asig >> 3);
+      int lpsig = lpf.next(asig >> 3);
+      return (asig >> 3) - lpsig;
       // return aSin.phMod(vibrato); // return an int signal centred around 0
     } else if (waveform == 1) {
-      return aSaw.phMod(vibrato); // return an int signal centred around 0
+      for (int i = 0; i < keyCount; i++) {
+        asig += aSaw[i].phMod(vibrato);
+      }
+      return asig >> 3; // return an int signal centred around 0
     } else if (waveform == 2) {
-      return aSqu.phMod(vibrato);
+      for (int i = 0; i < keyCount; i++) {
+        asig += aSqu[i].phMod(vibrato);
+      }
+      return asig >> 3;
     } else {
-      return aCos.phMod(vibrato); // return an int signal centred around 0
+      for (int i = 0; i < keyCount; i++) {
+        asig += aCos[i].phMod(vibrato);
+      }
+      return asig >> 3; // return an int signal centred around 0
     }
   } else {
     return 0;
