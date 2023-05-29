@@ -27,42 +27,28 @@
 // MCP4725 DAC
 Adafruit_MCP4725 dac;
 
-// constants won't change. They're used here to set pin numbers:
-const int buttonPin = 6;  // the number of the pushbutton pin
-const int ledPin = 2;    // the number of the LED pin
-
-// variables will change:
-int buttonState = 0;  // variable for reading the pushbutton status
-int i = 0;
+// Define the range of input pins
+const int START_PIN = 6;
+const int END_PIN = 13;
 
 void setup() {
-  // initialize the LED pin as an output:
-  pinMode(ledPin, OUTPUT);
-  // initialize the pushbutton pin as an input:
-  pinMode(buttonPin, INPUT);
-
-  // Begin I2C communication and init DAC
-  Wire.begin();
-  dac.begin(0x62);  // The I2C Address: Run the I2C Scanner if you're not sure
+  // Begin serial communication at 9600 baud
+  Serial.begin(9600);
+  
+  // Set each pin from 6 to 13 as an INPUT
+  for(int i = START_PIN; i <= END_PIN; i++) {
+    pinMode(i, INPUT);
+  }
 }
 
 void loop() {
-  // read the state of the pushbutton value:
-  buttonState = digitalRead(buttonPin);
-
-  // check if the pushbutton is pressed. If it is, the buttonState is HIGH:
-  if (buttonState == HIGH) {
-    // turn LED on:
-    digitalWrite(ledPin, HIGH);
-    // Generate a sine wave
-    dac.setVoltage((uint16_t)(2048 + 2047 * sin(i * (PI / 180.0))), false);
-    i++;
-    if (i > 360) i = 0;  // Reset the phase of the sine wave after a full cycle
-  } else {
-    // turn LED off and mute the DAC:
-    digitalWrite(ledPin, LOW);
-    dac.setVoltage(0, false);
+  // For each pin from 6 to 13
+  for(int i = START_PIN; i <= END_PIN; i++) {
+    // If the button on that pin is pressed (LOW because the button is connected to the ground through a resistor when pressed)
+    if(digitalRead(i) == LOW) {
+      // Print the pin number to the serial monitor
+      Serial.println(i);
+      delay(100);  // add a delay to debounce the button press
+    }
   }
-  // Short delay so the wave isn't too high frequency
-  delay(2);
 }
